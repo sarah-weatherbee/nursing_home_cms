@@ -7,3 +7,4 @@ data_pre_proc
 data_post_proc
 geo_data_pre_proc
 footprint.html
+airflow_venv
