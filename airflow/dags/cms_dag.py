@@ -4,14 +4,26 @@ from airflow.providers.http.sensors.http import HttpSensor
 from airflow.providers.http.operators.http import SimpleHttpOperator
 from airflow.operators.python import PythonOperator
 import requests
+from urllib.request import urlopen
+import boto3
 import json
 import pandas as pd
-from dateutil.relativedelta import relativedelta, MO, SU
 from pandas.tseries.offsets import Week
+import s3fs
+import pyarrow as pa
+import pyarrow.parquet as pq
+from pyarrow import table
+from datetime import datetime, timedelta, date
+from dateutil.relativedelta import relativedelta, MO, SU
 import time
 
 url = "https://data.cms.gov/data.json"
 title = "COVID-19 Nursing Home Data"
+
+def write_df_to_parquet_s3(dataframe,filename):
+    print("Writing {} records to {}".format(len(dataframe),filename))
+    output_file = f"s3://{DESTINATION}/{filename}/data.parquet"
+    dataframe.to_parquet(output_file)
 
 def get_endpoint():
     response = requests.request("GET",url)
@@ -67,8 +79,18 @@ def extract_raw_cms_data():
     # json_latest_data = json.dumps(latest_data)
     # save as parquet file
     pq_latest_raw_data = df_latest_raw_data.to_parquet("data_pre_proc/nh_pre_proc_raw.parquet", engine='auto', compression='snappy', index=None, partition_cols=None)
+
     return df_latest_raw_data, pq_latest_raw_data
 
+def transform_cms_data():
+    #transformation inputs:
+        #df_latest_raw_data
+        #s3://fips-codes-smw/fips-codes/data.parquet
+        s3 = s3fs.S3FileSystem()
+        fips_codes_df = pq.ParquetDataset(
+        's3://fips-codes-smw/fips-codes/data.parquet',
+        filesystem=s3).read_pandas().to_pandas()
+        print(fips_codes_df.head())
 
 
 default_args = {
